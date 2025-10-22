@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alluxio-config
+  namespace: alluxio-system
+data:
+  alluxio-site.properties: |
+    alluxio.master.hostname=alluxio-master.alluxio-system.svc.cluster.local
+    alluxio.worker.ramdisk.size=1GB
+    alluxio.security.stale.channel.purge.interval=365d
+    
+    # Configuración S3 corregida
+    alluxio.master.mount.table.root.ufs=s3://tach-dev-s3-minio-001
+    alluxio.underfs.s3.endpoint=https://s3.us-east-1.amazonaws.com
+    alluxio.underfs.s3.disable.dns.buckets=true
+    alluxio.underfs.s3.inherit.acl=false
+    alluxio.underfs.s3.threads.max=100
+    alluxio.underfs.s3.multipart.cleaner.enabled=true
+    
+    # Configuración de red para Kubernetes - Usar servicio para workers
+    alluxio.user.hostname=alluxio-master.alluxio-system.svc.cluster.local
+    alluxio.worker.hostname=alluxio-worker.alluxio-system.svc.cluster.local
+    
+    # Configuración adicional
+    alluxio.worker.tieredstore.levels=1
+    alluxio.worker.tieredstore.level0.alias=MEM
+    alluxio.worker.tieredstore.level0.dirs.path=/dev/shm
+    alluxio.worker.tieredstore.level0.dirs.quota=1GB
+    alluxio.worker.tieredstore.level0.watermark.high.ratio=0.9
+    alluxio.worker.tieredstore.level0.watermark.low.ratio=0.7
+
+    alluxio.user.file.writetype.default=CACHE_THROUGH
+    alluxio.user.ufs.block.read.location.policy=alluxio.client.block.policy.LocalFirstPolicy

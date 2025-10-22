@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alluxio-master
+  namespace: alluxio-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alluxio-master
+  template:
+    metadata:
+      labels:
+        app: alluxio-master
+    spec:
+      serviceAccountName: alluxio
+      dnsPolicy: ClusterFirst
+      containers:
+      - name: alluxio-master
+        image: alluxio/alluxio:2.9.3
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            # Configurar variables de entorno para S3
+            export AWS_ACCESS_KEY_ID=$(cat /etc/alluxio/credentials/accessKey)
+            export AWS_SECRET_ACCESS_KEY=$(cat /etc/alluxio/credentials/secretKey)
+            export ALLUXIO_UNDERFS_S3_ACCESS_KEY=$AWS_ACCESS_KEY_ID
+            export ALLUXIO_UNDERFS_S3_SECRET_KEY=$AWS_SECRET_ACCESS_KEY
+            /entrypoint.sh master-only
+        ports:
+        - containerPort: 19998
+        - containerPort: 19999
+        - containerPort: 20001
+        env:
+        - name: ALLUXIO_WORKER_RAMDISK_SIZE
+          value: "1GB"
+        - name: ALLUXIO_UNDERFS_S3_ENDPOINT
+          value: "s3.us-east-1.amazonaws.com"
+        - name: ALLUXIO_UNDERFS_S3_DISABLE_DNS_BUCKETS
+          value: "true"
+        - name: ALLUXIO_MASTER_HOSTNAME
+          value: "alluxio-master.alluxio-system.svc.cluster.local"
+        # Agregar variables AWS estándar
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: alluxio-s3-credentials
+              key: accessKey
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: alluxio-s3-credentials
+              key: secretKey
+        volumeMounts:
+        - name: alluxio-config
+          mountPath: /opt/alluxio/conf/alluxio-site.properties
+          subPath: alluxio-site.properties
+        - name: s3-credentials
+          mountPath: /etc/alluxio/credentials
+          readOnly: true
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/master/info
+            port: 19999
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /api/v1/master/info
+            port: 19999
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: alluxio-config
+        configMap:
+          name: alluxio-config
+      - name: s3-credentials
+        secret:
+          secretName: alluxio-s3-credentials

@@ -1,0 +1,21 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+
+# Archivos de providers de Terraform (muy grandes)
+**/terraform-provider-*
+
+# Lock file
+.terraform.lock.hcl
+
+# Variables sensibles
+#*.tfvars
+*.tfvars.json
+
+# Archivos temporales
+*.tar.gz
+
+# Backups
+backup.tfstate

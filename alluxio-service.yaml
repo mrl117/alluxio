@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: alluxio-master
+  namespace: alluxio-system
+  labels:
+    app: alluxio-master
+spec:
+  clusterIP: None  # Headless service para StatefulSet
+  ports:
+  - name: rpc
+    port: 19998
+    targetPort: 19998
+  - name: web
+    port: 19999
+    targetPort: 19999
+  - name: embedded
+    port: 20001
+    targetPort: 20001
+  selector:
+    app: alluxio-master
+  publishNotReadyAddresses: true # Importante para descubrimiento temprano

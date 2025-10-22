@@ -1,0 +1,90 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: alluxio-s3-test-final
+  namespace: alluxio-system
+spec:
+  template:
+    spec:
+      serviceAccountName: alluxio
+      containers:
+      - name: test
+        image: alluxio/alluxio:2.9.3
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            # Esperar a que Alluxio esté listo
+            echo "Esperando a que Alluxio esté listo..."
+            sleep 30
+            
+            # Configurar credenciales S3
+            export AWS_ACCESS_KEY_ID=$(cat /etc/alluxio/credentials/accessKey)
+            export AWS_SECRET_ACCESS_KEY=$(cat /etc/alluxio/credentials/secretKey)
+            export ALLUXIO_UNDERFS_S3_ACCESS_KEY=$AWS_ACCESS_KEY_ID
+            export ALLUXIO_UNDERFS_S3_SECRET_KEY=$AWS_SECRET_ACCESS_KEY
+            
+            echo "=== Verificando estado de Alluxio ==="
+            
+            # Verificar conexión con el master
+            echo "1. Verificando conexión con Alluxio Master..."
+            alluxio fsadmin report
+            
+            echo "2. Verificando workers conectados..."
+            alluxio fsadmin report capacity
+            
+            echo "=== Probando operaciones con S3 ==="
+            
+            # Probar operaciones básicas
+            echo "3. Listando directorio raíz..."
+            alluxio fs ls / || echo "No se puede listar el root"
+            
+            echo "4. Creando directorio de prueba..."
+            alluxio fs mkdir /test-final || echo "No se puede crear directorio (puede que ya exista)"
+            
+            echo "5. Creando archivo de prueba local..."
+            echo "Hello from Alluxio and S3! - $(date)" > /tmp/test-file.txt
+            
+            echo "6. Copiando archivo a Alluxio..."
+            alluxio fs copyFromLocal /tmp/test-file.txt /test-final/test-file.txt || echo "No se puede copiar archivo"
+            
+            echo "7. Listando contenido del directorio /test-final:"
+            alluxio fs ls /test-final || echo "No se puede listar directorio"
+            
+            echo "8. Leyendo archivo desde Alluxio:"
+            alluxio fs cat /test-final/test-file.txt || echo "No se puede leer archivo"
+            
+            echo "9. Verificando persistencia en S3..."
+            echo "El archivo debería estar sincronizado con S3 automáticamente"
+            
+            echo "10. Estadísticas finales:"
+            alluxio fsadmin report
+            
+            echo "=== Prueba completada exitosamente ==="
+        env:
+        - name: ALLUXIO_MASTER_HOSTNAME
+          value: "alluxio-master.alluxio-system.svc.cluster.local"
+        - name: ALLUXIO_UNDERFS_S3_ENDPOINT
+          value: "s3.us-east-1.amazonaws.com"
+        - name: ALLUXIO_UNDERFS_S3_DISABLE_DNS_BUCKETS
+          value: "true"
+        # Agregar variables AWS estándar
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: alluxio-s3-credentials
+              key: accessKey
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: alluxio-s3-credentials
+              key: secretKey
+        volumeMounts:
+        - name: s3-credentials
+          mountPath: /etc/alluxio/credentials
+          readOnly: true
+      volumes:
+      - name: s3-credentials
+        secret:
+          secretName: alluxio-s3-credentials
+      restartPolicy: Never
+  backoffLimit: 3
